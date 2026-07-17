@@ -1,0 +1,2 @@
+"""Logical cockpit screen contracts."""
+

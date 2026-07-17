@@ -1,0 +1,2 @@
+"""Cockpit command adapters."""
+

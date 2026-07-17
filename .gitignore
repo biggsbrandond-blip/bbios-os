@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.coverage
+data/tasks.json
+data/workflows.json
+data/workflow_instances.json
+data/workflow_templates.json
+data/workflow_template_lineage.json
+data/integration_registry.json
+data/client_entities.json
+data/onboarding_entities.json
+data/client_executions.json
+data/client_plans.json
+data/client_usage.json

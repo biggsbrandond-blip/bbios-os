@@ -1,0 +1,77 @@
+name: BBIOS Cockpit System Template
+version: 0.1
+
+description: >
+  Base template for generating modular FastAPI backend systems
+  using the BBIOS architecture pattern.
+
+architecture:
+  api_layer:
+    framework: FastAPI
+    entry_file: api.py
+    base_path: /cockpit
+    docs_enabled: true
+
+  router_layer:
+    file: router.py
+    pattern: APIRouter
+    responsibilities:
+      - endpoint definitions
+      - request validation
+      - delegation to service layer
+
+  service_layer:
+    file: service.py
+    pattern: class-based service
+    responsibilities:
+      - business logic
+      - client management
+      - execution tracking
+      - state mutation
+
+  execution_model:
+    type: pipeline
+    mode: synchronous
+    features:
+      - test_pipeline
+      - execution logging
+
+  state_layer:
+    type: in_memory
+    future_upgrade: json_or_database
+    entities:
+      - client
+      - execution
+
+  endpoints:
+    - path: /
+      method: GET
+      type: health_check
+
+    - path: /health
+      method: GET
+      type: system_health
+
+    - path: /create-client
+      method: POST
+      input: ClientRequest
+      output: ClientObject
+
+    - path: /test-pipeline
+      method: POST
+      type: execution_test
+
+rules:
+  - API layer must never contain business logic
+  - router must not store state
+  - service layer owns all logic
+  - state must remain in-memory at this stage
+  - database is forbidden until explicitly enabled
+  - execution must go through service layer only
+
+future_modules:
+  - authentication
+  - database_layer
+  - workflow_engine
+  - monetization_hooks
+  - frontend_dashboard
