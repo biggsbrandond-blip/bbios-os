@@ -18,19 +18,24 @@ Credential and secret reads currently present in auth and integration modules ar
 
 ## 4. Canonical API Structure
 
-The approved target API structure is versioned FastAPI routes delegating to handlers/adapters and then to application services. Full `/v1/*` FastAPI consolidation is not implemented yet.
+The approved target API structure is versioned FastAPI routes delegating to handlers/adapters and then to application services. Full `/v1/*` FastAPI consolidation is not implemented yet, but stable task and client-management handler contracts now have focused FastAPI adapters.
 
 Current supported API surfaces are:
 
 - FastAPI prototype cockpit routes under the configured cockpit prefix, defaulting to `/cockpit`.
+- FastAPI adapter routes for `/v1/tasks`, `/v1/tasks/{task_id}`, `/clients`, and `/v1/clients`.
 - Internal handler-style `/v1/*` routes through `TaskRequestHandler` and `EntityRouteRegistry`.
 - Compatibility `/clients` handling normalized by `TaskRequestHandler`.
 
-Route-registration ownership for the current FastAPI app lives in `bbi_os.app.create_app()`, which includes `bbi_os.cockpit.router.router` under the configured API prefix and registers `/` and `/health`.
+Route-registration ownership for the current FastAPI app lives in `bbi_os.app.create_app()`, which includes `bbi_os.cockpit.router.router` under the configured API prefix, includes `bbi_os.api.v1.router` once, and registers `/` and `/health`.
+
+`bbi_os.api.v1` owns the current FastAPI adapter boundary. Adapter functions must translate FastAPI path/body/header inputs into the existing handler request shape, delegate to handlers or handler-backed services, and return the captured status code and response body without response-envelope redesign.
+
+Deferred handler contracts include `/v1/cockpit/*`, workflow, execution, monetization, onboarding, pipeline, integration, webhook, and workflow-template routes whose runtime service composition is not yet approved for the canonical FastAPI app.
 
 ## 5. Canonical Handler Boundary
 
-Handlers and adapters translate request/response concerns, route matching, body parsing, status codes, and error mapping. They must delegate business behavior to services.
+Handlers and adapters translate request/response concerns, route matching, body parsing, status codes, and error mapping. They must delegate business behavior to services and preserve existing response envelopes.
 
 Known handlers include `TaskRequestHandler`, `WorkflowApiHandler`, `WorkflowTemplateApiHandler`, `ClientExecutionApiHandler`, `ClientPipelineApiHandler`, `ClientMonetizationApiHandler`, `ClientManagementApiHandler`, `ConnectorApiHandler`, `WebhookApiHandler`, and `CockpitApiHandler`.
 
@@ -84,7 +89,7 @@ Logging must preserve request context, avoid interrupting business execution thr
 
 ## 13. Compatibility Policy
 
-Compatibility layers remain valid until explicit deprecation is approved. Current compatibility layers include legacy app imports from `bbi_os.__main__` and `bbi_os.cockpit.api`, the cockpit prototype routes, richer cockpit handler/facade paths, `/clients` normalization, zero-argument `CockpitService()`, and top-level test wrappers.
+Compatibility layers remain valid until explicit deprecation is approved. Current compatibility layers include legacy app imports from `bbi_os.__main__` and `bbi_os.cockpit.api`, the cockpit prototype routes, richer cockpit handler/facade paths, `/clients` and `/v1/clients` FastAPI adapters, `/clients` normalization, zero-argument `CockpitService()`, and top-level test wrappers.
 
 ## 14. Deprecation Policy
 
@@ -108,7 +113,7 @@ PostgreSQL, SQLAlchemy, and Alembic are planned future work, not current impleme
 
 ## 17. Frontend Integration Expectations
 
-The React cockpit currently expects read-only `/v1/cockpit/*` endpoints and `/clients` list/create behavior. Future FastAPI consolidation must either preserve these paths or update frontend usage under an approved compatibility plan.
+The React cockpit currently expects read-only `/v1/cockpit/*` endpoints and `/clients` list/create behavior. The `/clients` list/create path is now served by the FastAPI adapter. The `/v1/cockpit/*` paths remain deferred until rich cockpit runtime composition is approved. Future FastAPI consolidation must either preserve these paths or update frontend usage under an approved compatibility plan.
 
 ## 18. Contract Change Approval Rules
 

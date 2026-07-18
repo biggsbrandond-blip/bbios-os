@@ -19,6 +19,15 @@ EXPECTED_CUSTOM_ROUTES = {
     ("GET", "/cockpit/client/{client_id}"),
     ("GET", "/cockpit/clients/search"),
     ("POST", "/cockpit/test-pipeline"),
+    ("GET", "/v1/tasks"),
+    ("POST", "/v1/tasks"),
+    ("GET", "/v1/tasks/{task_id}"),
+    ("PATCH", "/v1/tasks/{task_id}"),
+    ("DELETE", "/v1/tasks/{task_id}"),
+    ("GET", "/clients"),
+    ("POST", "/clients"),
+    ("GET", "/v1/clients"),
+    ("POST", "/v1/clients"),
 }
 
 

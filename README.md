@@ -178,6 +178,20 @@ POST /cockpit/test-pipeline
 
 Additional versioned Cockpit endpoints are used by the React frontend.
 
+The canonical FastAPI app also exposes handler-backed compatibility routes for:
+
+```http
+GET /v1/tasks
+POST /v1/tasks
+GET /v1/tasks/{task_id}
+PATCH /v1/tasks/{task_id}
+DELETE /v1/tasks/{task_id}
+GET /clients
+POST /clients
+GET /v1/clients
+POST /v1/clients
+```
+
 ---
 
 ## Example Client Object

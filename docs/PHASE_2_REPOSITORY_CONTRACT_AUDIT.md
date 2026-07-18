@@ -2,16 +2,17 @@
 
 ## 1. Executive Summary
 
-Phase 2A reviewed the repository contract surface after the published `v0.1.0` baseline. Confirmed current state: BBIOS OS is a Python 3.12 project with FastAPI cockpit prototype routes, internal `/v1/*` handler-style routes, layered services, JSON-backed repositories, process-local observability, and a React cockpit UI.
+Phase 2A reviewed the repository contract surface after the published `v0.1.0` baseline. Confirmed current state: BBIOS OS is a Python 3.12 project with FastAPI cockpit prototype routes, focused FastAPI adapters for stable handler-style routes, internal `/v1/*` handler-style routes, layered services, JSON-backed repositories, process-local observability, and a React cockpit UI.
 
 The most important safe cleanup found and implemented was removal of application-service dependence on the private execution repository `_read()` method. `ExecutionStateRepository.list()` now provides the public all-record read contract, and `CockpitService._execution_records()` uses it. `_read()` remains in place as a private implementation detail for repository internals.
 
-No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, route consolidation, endpoint removal, request shape change, response shape change, or file format change was introduced.
+No PostgreSQL, SQLAlchemy, Alembic, new authentication system, Docker, CI/CD, deployment, endpoint removal, request shape change, response shape change, or file format change was introduced.
 
 ## 2. Current Architecture Map
 
 - Runtime entry points: `bbi_os/app.py` defines the canonical FastAPI `create_app()` factory and module-level `app`. `bbi_os/cockpit/api.py` and `bbi_os/__main__.py` preserve legacy imports by re-exporting the canonical objects.
 - Prototype API: `bbi_os/cockpit/router.py` exposes `/create-client`, `/client/{client_id}`, `/clients/search`, and `/test-pipeline` under `settings.api_prefix`, which defaults to `/cockpit` in `bbi_os/settings.py`.
+- FastAPI adapter API: `bbi_os/api/v1.py` exposes stable handler-backed FastAPI routes for `/v1/tasks`, `/v1/tasks/{task_id}`, `/clients`, and `/v1/clients`.
 - Versioned internal API: `TaskRequestHandler` in `bbi_os/task_management/api.py` uses `EntityRouteRegistry` in `bbi_os/entity_routing.py` to dispatch `/v1/*` routes to handler adapters.
 - Cockpit compatibility API: `CockpitApiHandler` in `bbi_os/cockpit/handler.py` handles `/v1/cockpit/*` request paths for tests and frontend expectations.
 - Services: `TaskService`, `ClientExecutionService`, `ClientMonetizationService`, `ClientPipelineService`, `OnboardingService`, `ClientManagementService`, and `CockpitService` own application behavior.
@@ -43,12 +44,12 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 ### RC-PKG-003 - Import side effects through module-level objects
 
 - Location: `bbi_os/app.py`, `bbi_os/cockpit/api.py`, `bbi_os/cockpit/router.py`, `bbi_os/__main__.py`, `bbi_os/task_management/api.py`.
-- Current behavior: Importing `bbi_os.app` constructs the canonical FastAPI app. Legacy app modules re-export that app. Importing `bbi_os/cockpit/router.py` still constructs an `APIRouter` and module-level `CockpitService()`. Importing `bbi_os/task_management/api.py` still constructs an `Authenticator()` and `EntityRouteRegistry()`.
+- Current behavior: Importing `bbi_os.app` constructs the canonical FastAPI app. Legacy app modules re-export that app. Importing `bbi_os/api/v1.py` constructs an `APIRouter` and lightweight cached adapter factories. Importing `bbi_os/cockpit/router.py` still constructs an `APIRouter` and module-level `CockpitService()`. Importing `bbi_os/task_management/api.py` still constructs an `Authenticator()` and `EntityRouteRegistry()`.
 - Intended contract: Import-time construction should remain lightweight and deterministic until app factory consolidation is approved.
 - Risk: Medium. Side effects are currently simple, but future settings, auth, or persistence changes could make imports stateful.
 - Recommended action: Keep app creation centralized in `bbi_os.app`; defer broader import-side-effect cleanup.
 - Safe now: Partially implemented for FastAPI app creation.
-- Tests protecting behavior: `tests/test_settings.py`, `tests/test_task_api.py`, `tests/test_cockpit.py`.
+- Tests protecting behavior: `tests/test_settings.py`, `tests/test_task_api.py`, `tests/test_cockpit.py`, `tests/test_api_v1_adapter.py`.
 
 ## 4. Runtime Contract Findings
 
@@ -61,6 +62,16 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 - Recommended action: Preserve this contract until `/v1/*` FastAPI adapters are approved.
 - Safe now: Yes, implemented.
 - Tests protecting behavior: `tests/test_runtime_contract.py`, `tests/test_settings.py`.
+
+### RC-RUN-003 - Versioned FastAPI adapter router added
+
+- Location: `bbi_os/api/v1.py`, `bbi_os/app.py`, `tests/test_api_v1_adapter.py`.
+- Current behavior: The canonical FastAPI app includes `bbi_os.api.v1.router` once. The adapter exposes stable task and client-management handler contracts without moving business logic into route functions.
+- Intended contract: FastAPI routes translate request inputs into existing handler request surfaces, delegate to handlers/services, and return captured status codes and response envelopes unchanged.
+- Risk: Medium. The adapter introduces new public HTTP routes and persistent JSON-backed runtime paths under `settings.data_dir`.
+- Recommended action: Keep the adapter narrow until richer cockpit/workflow runtime composition is approved.
+- Safe now: Yes, implemented for `/v1/tasks`, `/v1/tasks/{task_id}`, `/clients`, and `/v1/clients`.
+- Tests protecting behavior: `tests/test_api_v1_adapter.py`.
 
 ### RC-RUN-002 - Centralized settings are partial
 
@@ -87,22 +98,45 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 ### RC-API-002 - Versioned handler envelope
 
 - Location: `bbi_os/task_management/api.py`, `bbi_os/response_contract.py`, `bbi_os/cockpit/handler.py`.
-- Current behavior: Internal handlers return envelopes with `request_id`, `status`, `data`, and `execution_summary`.
-- Intended contract: This envelope should be preserved for `/v1/*` handler-style APIs and future FastAPI route adapters.
+- Current behavior: Internal handlers return envelopes with `request_id`, `status`, `data`, and `execution_summary`. The FastAPI adapter in `bbi_os/api/v1.py` returns the handler-generated body and status code for implemented stable routes.
+- Intended contract: This envelope must be preserved for `/v1/*` handler-style APIs and FastAPI route adapters.
 - Risk: High if changed, because tests and frontend error handling rely on it.
-- Recommended action: Add explicit route-contract tests during API consolidation.
-- Safe now: No broad change.
-- Tests protecting behavior: `tests/test_task_api.py`, `tests/test_cockpit.py`, workflow, integration, monetization, onboarding, pipeline, and execution tests.
+- Recommended action: Add route-contract tests for each route as it becomes safely adaptable.
+- Safe now: Implemented for task CRUD and client list/create adapters only.
+- Tests protecting behavior: `tests/test_task_api.py`, `tests/test_cockpit.py`, `tests/test_api_v1_adapter.py`, workflow, integration, monetization, onboarding, pipeline, and execution tests.
 
 ### RC-API-003 - Frontend expects `/v1/cockpit/*` and `/clients`
 
 - Location: `cockpit-ui/src/lib/api.js`, `cockpit-ui/README.md`.
-- Current behavior: Read views call `/v1/cockpit/system-overview`, `/usage`, `/billing-summary`, `/executions`, and `/client/{id}`. Client list/create call `/clients`.
-- Intended contract: Frontend/backend contract is current but not fully documented in backend runtime wiring.
-- Risk: Medium. FastAPI default prefix remains `/cockpit`, so `/v1/cockpit/*` is not served by `bbi_os/cockpit/api.py` as currently written.
-- Recommended action: Later create explicit versioned FastAPI route adapters or document the separate internal handler runtime.
-- Safe now: Deferred; adding routes changes public API.
-- Tests protecting behavior: `bbi_os/cockpit/tests/test_cockpit.py`, `bbi_os/cockpit/tests/test_client_management.py`.
+- Current behavior: Read views call `/v1/cockpit/system-overview`, `/usage`, `/billing-summary`, `/executions`, and `/client/{id}`. Client list/create call `/clients`. FastAPI now serves `/clients` through the client-management handler adapter; `/v1/cockpit/*` remains internal handler behavior only.
+- Intended contract: Frontend/backend contract is partly served by FastAPI now and partly deferred until rich cockpit runtime composition is approved.
+- Risk: Medium. FastAPI default prefix remains `/cockpit`, and `/v1/cockpit/*` is not yet served by the canonical FastAPI app.
+- Recommended action: Later create explicit versioned FastAPI route adapters for `/v1/cockpit/*` after dependency-injected `CockpitService` runtime composition is approved.
+- Safe now: Partially implemented for `/clients`; `/v1/cockpit/*` deferred.
+- Tests protecting behavior: `bbi_os/cockpit/tests/test_cockpit.py`, `bbi_os/cockpit/tests/test_client_management.py`, `tests/test_api_v1_adapter.py`.
+
+### RC-API-004 - Handler-to-route matrix
+
+| Method | Route | Handler | Request Shape | Response Shape | Status Behavior | Frontend Dependency | Phase 2C Decision |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| GET | `/v1/tasks` | `TaskRequestHandler._get()` | Headers only | Standard envelope with task list in `data` | 200, 401 invalid token | None found | Implemented |
+| POST | `/v1/tasks` | `TaskRequestHandler._post()` | JSON object with `title`, `description`, `status` | Standard envelope with task in `data` | 201, 400, 401, 403, 500 | None found | Implemented |
+| GET | `/v1/tasks/{task_id}` | `TaskRequestHandler._get()` | Path `task_id` | Standard envelope with task in `data` | 200, 401, 404 | None found | Implemented |
+| PATCH | `/v1/tasks/{task_id}` | `TaskRequestHandler._patch()` | JSON object with updatable fields | Standard envelope with task in `data` | 200, 400, 401, 403, 404, 500 | None found | Implemented |
+| DELETE | `/v1/tasks/{task_id}` | `TaskRequestHandler._delete()` | Path `task_id` | Standard envelope with empty object in `data` | 200, 401, 403, 404 | None found | Implemented |
+| GET | `/clients` | `ClientManagementApiHandler.handle()` | Headers only | Standard envelope with client list in `data` | 200, 500 | `cockpit-ui/src/lib/api.js` | Implemented |
+| POST | `/clients` | `ClientManagementApiHandler.handle()` | JSON object with `name`, `plan` | Standard envelope with client in `data` | 201, 400, 500 | `cockpit-ui/src/lib/api.js` | Implemented |
+| GET | `/v1/clients` | `ClientManagementApiHandler.handle()` | Headers only | Standard envelope with client list in `data` | 200, 500 | Compatibility with internal normalized path | Implemented |
+| POST | `/v1/clients` | `ClientManagementApiHandler.handle()` | JSON object with `name`, `plan` | Standard envelope with client in `data` | 201, 400, 500 | Compatibility with internal normalized path | Implemented |
+| GET | `/v1/cockpit/system-overview` | `CockpitApiHandler.handle()` | Rich `CockpitService` dependencies | Standard envelope with overview in `data` | 200 or 400 for cockpit control errors; default service would raise dependency errors | `cockpit-ui/src/lib/api.js` | Deferred |
+| GET | `/v1/cockpit/client/{client_id}` | `CockpitApiHandler.handle()` | Rich `CockpitService` dependencies and path client id | Standard envelope with client view in `data` | 200, route-not-found for missing id, 400 for cockpit control errors | `cockpit-ui/src/lib/api.js` | Deferred |
+| GET | `/v1/cockpit/executions` | `CockpitApiHandler.handle()` | Rich `CockpitService` dependencies | Standard envelope with execution monitor in `data` | 200 or 400 for cockpit control errors; default service would raise dependency errors | `cockpit-ui/src/lib/api.js` | Deferred |
+| GET | `/v1/cockpit/usage` | `CockpitApiHandler.handle()` | Rich `CockpitService` dependencies | Standard envelope with usage in `data` | 200 or 400 for cockpit control errors; default service would raise dependency errors | `cockpit-ui/src/lib/api.js` | Deferred |
+| GET | `/v1/cockpit/billing-summary` | `CockpitApiHandler.handle()` | Rich `CockpitService` dependencies | Standard envelope with billing summary in `data` | 200 or 400 for cockpit control errors; default service would raise dependency errors | `cockpit-ui/src/lib/api.js` | Deferred |
+| GET | `/v1/cockpit/workflow/control` | `CockpitApiHandler.handle()` | Rich `CockpitService` dependencies | Standard envelope with workflow control in `data` | 200 or 400 for cockpit control errors; default service would raise dependency errors | None found | Deferred |
+| POST | `/v1/cockpit/workflow/execute` | `CockpitApiHandler.handle()` | JSON object accepted by `CockpitService.execute()` | Standard envelope with execution result in `data` | 201 or 400 for cockpit control errors; default service would raise dependency errors | None found | Deferred |
+| POST | `/v1/cockpit/workflow/retry/{execution_id}` | `CockpitApiHandler.handle()` | Path `execution_id` | Standard envelope with retry result in `data` | 200, route-not-found for missing id, 400 for cockpit control errors | None found | Deferred |
+| POST | `/v1/cockpit/workflow/cancel/{execution_id}` | `CockpitApiHandler.handle()` | Path `execution_id` | Standard envelope with empty object in `data` | 200, route-not-found for missing id, 400 for cockpit control errors | None found | Deferred |
 
 ## 6. Service Contract Findings
 
@@ -236,8 +270,9 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 
 ## 11. Architectural Drift
 
-- FastAPI is accepted as the future canonical HTTP boundary, but full `/v1/*` FastAPI consolidation is unimplemented.
+- FastAPI is accepted as the future canonical HTTP boundary, but full `/v1/*` FastAPI consolidation is incomplete.
 - FastAPI app construction is now centralized in `bbi_os/app.py`; legacy app import paths remain compatibility exports.
+- Focused FastAPI adapters now exist for task CRUD and client list/create handler contracts in `bbi_os/api/v1.py`.
 - Internal `BaseHTTPRequestHandler` routing supports richer `/v1/*` handler contracts than the FastAPI prototype.
 - The React cockpit targets richer `/v1/cockpit/*` endpoints while the FastAPI router exposes `/cockpit/*` prototype endpoints by default.
 - JSON repository implementations expose public domain methods but still use duplicated private file mechanics internally.
@@ -245,7 +280,7 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 ## 12. Duplicate or Competing Contracts
 
 - App contract: canonical `bbi_os.app:app`, with compatibility imports from `bbi_os.cockpit.api:app` and `bbi_os.__main__:app`.
-- HTTP contract: `/cockpit/*` prototype routes and `/v1/*` internal handler routes.
+- HTTP contract: `/cockpit/*` prototype routes, FastAPI adapter routes for stable `/v1/tasks` and client-management paths, and remaining internal handler routes.
 - Client contract: prototype `client_name`/`plan` payload and richer client-management `name`/`plan` payload.
 - Response contract: direct prototype dictionaries and standardized internal envelopes.
 - Repository read contract: public typed reads and private raw `_read()` internals.
@@ -254,6 +289,7 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 
 - `CockpitService` zero-argument constructor preserves prototype behavior.
 - `CockpitService` dependency-injected constructor supports rich cockpit dashboard/control behavior.
+- `bbi_os.api.v1` preserves handler response envelopes for implemented FastAPI adapter paths.
 - `CockpitApiHandler` is exported from `bbi_os.cockpit.api` while implemented in `bbi_os/cockpit/handler.py`.
 - `TaskRequestHandler._resolved_entity_route()` maps `/clients` to `/v1/clients`.
 - Top-level `tests/test_*.py` wrappers preserve discovery of nested test packages.
@@ -273,20 +309,20 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 ## 16. Risk Classification
 
 - Low risk: adding public repository methods that delegate to existing private reads; documentation of current contracts; focused tests.
-- Medium risk: app factory consolidation, package export additions, JSON utility extraction, frontend/backend route documentation.
-- High risk: API consolidation, route removal, response envelope changes, persistence migration, transaction boundary changes, authentication/security changes.
+- Medium risk: package export additions, JSON utility extraction, frontend/backend route documentation, focused handler-backed FastAPI adapters.
+- High risk: full API consolidation, route removal, response envelope changes, persistence migration, transaction boundary changes, authentication/security changes.
 
 ## 17. Safe Cleanup Candidates
 
 - Implemented: add `ExecutionStateRepository.list()` and update `CockpitService` to use it.
 - Candidate: add explicit docstrings for compatibility routes.
-- Candidate: add route inventory tests for currently supported handler paths.
+- Implemented: add route inventory tests for currently supported FastAPI and focused adapter paths.
 - Candidate: add package exports only for already-used public classes after approval.
 
 ## 18. Deferred Cleanup Candidates
 
 - Continue monitoring canonical FastAPI app creation through runtime contract tests.
-- Create versioned FastAPI route adapters for `/v1/*`.
+- Create versioned FastAPI route adapters for deferred `/v1/cockpit/*`, workflow, execution, monetization, onboarding, pipeline, integration, webhook, and workflow-template handlers after runtime composition is approved.
 - Centralize secret-related environment access.
 - Extract shared JSON repository file utilities.
 - Document and test frontend/backend route contracts end to end.
@@ -306,7 +342,7 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 2. Add explicit package export policy and minimal exports for stable public classes.
 3. Inventory and test supported HTTP route surfaces.
 4. Consolidate FastAPI app creation without changing route behavior.
-5. Add `/v1/*` FastAPI adapters that delegate to existing handlers/services.
+5. Continue adding `/v1/*` FastAPI adapters that delegate to existing handlers/services when service composition is explicit.
 6. Define repository equivalence tests before PostgreSQL implementation.
 7. Begin persistence work only after transaction and migration plans are approved.
 
@@ -317,5 +353,7 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 - Supported import paths are documented and tested.
 - Canonical runtime entry point is documented and validated.
 - `/cockpit/*`, `/clients`, and `/v1/*` compatibility expectations are documented.
+- Stable task and client-management handler contracts are served by FastAPI adapters with route tests.
+- Deferred handler contracts are explicitly listed with deferral reasons.
 - Full unittest discovery and compile checks pass.
 - No persistence, auth, deployment, or route-consolidation work starts without approval.

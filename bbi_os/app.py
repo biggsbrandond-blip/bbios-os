@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from bbi_os.api.v1 import router as v1_router
 from bbi_os.cockpit.router import router as cockpit_router
 from bbi_os.settings import get_settings
 
@@ -14,6 +15,7 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(cockpit_router, prefix=settings.api_prefix)
+    application.include_router(v1_router)
 
     @application.get("/")
     def root():
