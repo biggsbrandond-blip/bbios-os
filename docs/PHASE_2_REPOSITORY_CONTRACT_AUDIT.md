@@ -10,7 +10,7 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 
 ## 2. Current Architecture Map
 
-- Runtime entry points: `bbi_os/cockpit/api.py` defines a module-level FastAPI `app`; `bbi_os/__main__.py` defines `create_app()` and a second module-level FastAPI `app`.
+- Runtime entry points: `bbi_os/app.py` defines the canonical FastAPI `create_app()` factory and module-level `app`. `bbi_os/cockpit/api.py` and `bbi_os/__main__.py` preserve legacy imports by re-exporting the canonical objects.
 - Prototype API: `bbi_os/cockpit/router.py` exposes `/create-client`, `/client/{client_id}`, `/clients/search`, and `/test-pipeline` under `settings.api_prefix`, which defaults to `/cockpit` in `bbi_os/settings.py`.
 - Versioned internal API: `TaskRequestHandler` in `bbi_os/task_management/api.py` uses `EntityRouteRegistry` in `bbi_os/entity_routing.py` to dispatch `/v1/*` routes to handler adapters.
 - Cockpit compatibility API: `CockpitApiHandler` in `bbi_os/cockpit/handler.py` handles `/v1/cockpit/*` request paths for tests and frontend expectations.
@@ -42,25 +42,25 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 
 ### RC-PKG-003 - Import side effects through module-level objects
 
-- Location: `bbi_os/cockpit/api.py`, `bbi_os/cockpit/router.py`, `bbi_os/__main__.py`, `bbi_os/task_management/api.py`.
-- Current behavior: Importing these modules constructs FastAPI apps, an `APIRouter`, a module-level `CockpitService()`, an `Authenticator()`, and an `EntityRouteRegistry()`.
+- Location: `bbi_os/app.py`, `bbi_os/cockpit/api.py`, `bbi_os/cockpit/router.py`, `bbi_os/__main__.py`, `bbi_os/task_management/api.py`.
+- Current behavior: Importing `bbi_os.app` constructs the canonical FastAPI app. Legacy app modules re-export that app. Importing `bbi_os/cockpit/router.py` still constructs an `APIRouter` and module-level `CockpitService()`. Importing `bbi_os/task_management/api.py` still constructs an `Authenticator()` and `EntityRouteRegistry()`.
 - Intended contract: Import-time construction should remain lightweight and deterministic until app factory consolidation is approved.
 - Risk: Medium. Side effects are currently simple, but future settings, auth, or persistence changes could make imports stateful.
-- Recommended action: Consolidate app creation around `create_app()` in a later API-runtime cleanup.
-- Safe now: Deferred.
+- Recommended action: Keep app creation centralized in `bbi_os.app`; defer broader import-side-effect cleanup.
+- Safe now: Partially implemented for FastAPI app creation.
 - Tests protecting behavior: `tests/test_settings.py`, `tests/test_task_api.py`, `tests/test_cockpit.py`.
 
 ## 4. Runtime Contract Findings
 
-### RC-RUN-001 - Duplicate FastAPI app instances
+### RC-RUN-001 - FastAPI app instance consolidated
 
-- Location: `bbi_os/cockpit/api.py`, `bbi_os/__main__.py`.
-- Current behavior: Both files create a FastAPI `app`; `bbi_os/__main__.py` also provides `create_app()`.
-- Intended contract: `create_app()` should become the canonical application factory; FastAPI remains the accepted future HTTP boundary.
-- Risk: Medium. Duplicate apps can drift in metadata, route inclusion, and health endpoints.
-- Recommended action: Later consolidate runtime entry points while preserving existing import paths.
-- Safe now: Deferred because changing app imports may affect callers.
-- Tests protecting behavior: `tests/test_settings.py` validates app settings indirectly; API route tests are not yet comprehensive for FastAPI.
+- Location: `bbi_os/app.py`, `bbi_os/cockpit/api.py`, `bbi_os/__main__.py`, `tests/test_runtime_contract.py`.
+- Current behavior: `bbi_os.app.create_app()` is the canonical factory and `bbi_os.app.app` is the canonical module-level instance. Legacy imports from `bbi_os.__main__` and `bbi_os.cockpit.api` reference the same canonical app object.
+- Intended contract: FastAPI app construction happens in one place while legacy import paths remain compatible.
+- Risk: Low after test coverage. Route inventory and metadata are now explicitly tested.
+- Recommended action: Preserve this contract until `/v1/*` FastAPI adapters are approved.
+- Safe now: Yes, implemented.
+- Tests protecting behavior: `tests/test_runtime_contract.py`, `tests/test_settings.py`.
 
 ### RC-RUN-002 - Centralized settings are partial
 
@@ -237,14 +237,14 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 ## 11. Architectural Drift
 
 - FastAPI is accepted as the future canonical HTTP boundary, but full `/v1/*` FastAPI consolidation is unimplemented.
-- Two FastAPI app definitions coexist in `bbi_os/cockpit/api.py` and `bbi_os/__main__.py`.
+- FastAPI app construction is now centralized in `bbi_os/app.py`; legacy app import paths remain compatibility exports.
 - Internal `BaseHTTPRequestHandler` routing supports richer `/v1/*` handler contracts than the FastAPI prototype.
 - The React cockpit targets richer `/v1/cockpit/*` endpoints while the FastAPI router exposes `/cockpit/*` prototype endpoints by default.
 - JSON repository implementations expose public domain methods but still use duplicated private file mechanics internally.
 
 ## 12. Duplicate or Competing Contracts
 
-- App contract: `bbi_os.cockpit.api:app` and `bbi_os.__main__:app`.
+- App contract: canonical `bbi_os.app:app`, with compatibility imports from `bbi_os.cockpit.api:app` and `bbi_os.__main__:app`.
 - HTTP contract: `/cockpit/*` prototype routes and `/v1/*` internal handler routes.
 - Client contract: prototype `client_name`/`plan` payload and richer client-management `name`/`plan` payload.
 - Response contract: direct prototype dictionaries and standardized internal envelopes.
@@ -285,7 +285,7 @@ No PostgreSQL, SQLAlchemy, Alembic, authentication, Docker, CI/CD, deployment, r
 
 ## 18. Deferred Cleanup Candidates
 
-- Consolidate FastAPI app creation around a canonical factory.
+- Continue monitoring canonical FastAPI app creation through runtime contract tests.
 - Create versioned FastAPI route adapters for `/v1/*`.
 - Centralize secret-related environment access.
 - Extract shared JSON repository file utilities.

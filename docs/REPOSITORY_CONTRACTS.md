@@ -6,7 +6,9 @@ The supported runtime contract is Python `>=3.12,<3.13`, with Python 3.12.13 val
 
 ## 2. Canonical Application Entry Point
 
-The intended application factory is `bbi_os.__main__.create_app()`. Existing import paths that expose module-level FastAPI `app` objects remain compatibility paths until runtime consolidation is approved.
+The canonical application factory is `bbi_os.app.create_app()`. The canonical module-level application instance is `bbi_os.app.app`.
+
+Legacy imports from `bbi_os.__main__` and `bbi_os.cockpit.api` remain supported and must reference the same canonical app object.
 
 ## 3. Canonical Settings Access
 
@@ -23,6 +25,8 @@ Current supported API surfaces are:
 - FastAPI prototype cockpit routes under the configured cockpit prefix, defaulting to `/cockpit`.
 - Internal handler-style `/v1/*` routes through `TaskRequestHandler` and `EntityRouteRegistry`.
 - Compatibility `/clients` handling normalized by `TaskRequestHandler`.
+
+Route-registration ownership for the current FastAPI app lives in `bbi_os.app.create_app()`, which includes `bbi_os.cockpit.router.router` under the configured API prefix and registers `/` and `/health`.
 
 ## 5. Canonical Handler Boundary
 
@@ -80,7 +84,7 @@ Logging must preserve request context, avoid interrupting business execution thr
 
 ## 13. Compatibility Policy
 
-Compatibility layers remain valid until explicit deprecation is approved. Current compatibility layers include the cockpit prototype routes, richer cockpit handler/facade paths, `/clients` normalization, zero-argument `CockpitService()`, and top-level test wrappers.
+Compatibility layers remain valid until explicit deprecation is approved. Current compatibility layers include legacy app imports from `bbi_os.__main__` and `bbi_os.cockpit.api`, the cockpit prototype routes, richer cockpit handler/facade paths, `/clients` normalization, zero-argument `CockpitService()`, and top-level test wrappers.
 
 ## 14. Deprecation Policy
 

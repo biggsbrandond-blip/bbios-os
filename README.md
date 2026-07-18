@@ -223,7 +223,7 @@ Additional versioned Cockpit endpoints are used by the React frontend.
 From the repository root, run:
 
 ```bash
-uvicorn bbi_os.cockpit.api:app --reload
+uvicorn bbi_os.app:app --reload
 ```
 
 Then open the interactive API documentation:
