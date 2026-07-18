@@ -26,7 +26,7 @@ It is not presented as a production-ready commercial platform.
 - Client pipeline handling
 - Workflow and execution services
 - Task-management services
-- Authentication foundations
+- Request identity context for internal handlers
 - Integration management
 - Monetization and usage concepts
 - Execution logging and observability
@@ -301,7 +301,7 @@ This project demonstrates:
 - router and service separation;
 - reusable domain organization;
 - request and response contracts;
-- authentication foundations;
+- request identity and access-boundary concepts;
 - workflow-oriented system design;
 - frontend and backend integration;
 - automated testing;
