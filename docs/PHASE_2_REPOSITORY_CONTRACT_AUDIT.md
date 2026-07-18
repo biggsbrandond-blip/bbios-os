@@ -160,6 +160,26 @@ No PostgreSQL, SQLAlchemy, Alembic, new authentication system, Docker, CI/CD, de
 - Safe now: Yes, implemented.
 - Tests protecting behavior: `bbi_os/cockpit/tests/test_cockpit.py`, `bbi_os/client_execution/tests/test_execution.py`.
 
+### RC-SVC-003 - Cockpit execution controls reached through service internals
+
+- Location before cleanup: `bbi_os/cockpit/controls/execution_controls.py`, methods `retry()` and `inspect()`.
+- Current behavior before cleanup: `ExecutionControls` accessed `ClientExecutionService.state_repository.get()` directly.
+- Intended contract: Control adapters should call public service methods and should not depend on a service collaborator attribute when a public service read contract can represent the operation.
+- Risk: Low. `ClientExecutionService.get_execution()` delegates to the same public repository `get()` method and returns the same `ClientExecutionRecord` or `None`; `ExecutionControls` preserves its existing `CockpitControlError` handling.
+- Recommended action: Use `ClientExecutionService.get_execution()` for execution-id lookup from cockpit controls while retaining the previous `state_repository.get()` path only as a compatibility fallback for existing execution-service test doubles.
+- Safe now: Yes, implemented.
+- Tests protecting behavior: `tests/test_service_contracts.py`.
+
+### RC-SVC-004 - Monetization helper collaborators were hard-wired
+
+- Location before cleanup: `bbi_os/client_monetization/service.py`, constructor.
+- Current behavior before cleanup: `ClientMonetizationService` always constructed `PlanEnforcer(usage)` and `BillingSummaryGenerator(usage)` internally.
+- Intended contract: Services may accept explicit collaborators where doing so improves composition clarity while preserving default construction behavior.
+- Risk: Low. Four-argument construction still creates the same helper objects; injected helpers are optional and do not change usage event, billing, route, or persistence contracts.
+- Recommended action: Permit optional `PlanEnforcer` and `BillingSummaryGenerator` injection for focused composition and tests.
+- Safe now: Yes, implemented.
+- Tests protecting behavior: `tests/test_service_contracts.py`.
+
 ## 7. Repository Contract Findings
 
 ### RC-REP-001 - ExecutionStateRepository lacked public list-all method
@@ -336,6 +356,8 @@ No PostgreSQL, SQLAlchemy, Alembic, new authentication system, Docker, CI/CD, de
 
 - Implemented: add `ExecutionStateRepository.list()` and update `CockpitService` to use it.
 - Implemented: add public `exists()` and `count()` helpers to `JsonTaskRepository`, `JsonEntityRepository`, and `ExecutionStateRepository`.
+- Implemented: add `ClientExecutionService.get_execution()` and update cockpit execution controls to use the public service lookup contract.
+- Implemented: allow optional monetization helper injection while preserving existing `ClientMonetizationService` default construction.
 - Candidate: add explicit docstrings for compatibility routes.
 - Implemented: add route inventory tests for currently supported FastAPI and focused adapter paths.
 - Candidate: add package exports only for already-used public classes after approval.

@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from bbi_os.client_monetization.billing import BillingSummaryGenerator
@@ -22,13 +22,15 @@ class ClientMonetizationService:
         plans: ClientPlanRegistry,
         usage: UsageTracker,
         pricing: PricingEngine,
+        enforcer: Optional[PlanEnforcer] = None,
+        billing: Optional[BillingSummaryGenerator] = None,
     ) -> None:
         self.clients = clients
         self.plans = plans
         self.usage = usage
         self.pricing = pricing
-        self.enforcer = PlanEnforcer(usage)
-        self.billing = BillingSummaryGenerator(usage)
+        self.enforcer = enforcer or PlanEnforcer(usage)
+        self.billing = billing or BillingSummaryGenerator(usage)
 
     def get_plan(self, client_id: str) -> Dict[str, Any]:
         self._validate_client(client_id, require_auth=True)

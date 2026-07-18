@@ -64,6 +64,10 @@ class ClientExecutionService:
             raise ExecutionNotFound("Client execution was not found")
         return record
 
+    def get_execution(self, execution_id: str) -> ClientExecutionRecord | None:
+        """Return an execution record by id without applying client status semantics."""
+        return self.state_repository.get(execution_id)
+
     def _validate_access(self, client_id: str) -> None:
         context = current_request_context()
         if context["user_id"] in {"anonymous", "system", ""}:

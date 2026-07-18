@@ -45,6 +45,8 @@ Application services own orchestration and business rules. Services may coordina
 
 Compatibility services may retain optional constructor dependencies only when preserving an existing public contract.
 
+Service-to-service control adapters should use public service methods instead of reaching through a service to its repository collaborators. The current service inventory and Phase 2E rules are recorded in `docs/SERVICE_CONTRACTS.md`.
+
 ## 7. Canonical Repository Boundary
 
 Repositories expose public methods for supported reads and writes. Current public repository methods include patterns such as `list()`, `get()`, `exists()`, `count()`, `save()`, `delete()`, `latest_for_client()`, `list_for_client()`, `save_definition()`, `get_definition()`, `save_instance()`, and `get_instance()`.

@@ -23,7 +23,7 @@ class ExecutionControls:
         )
 
     def retry(self, execution_id: str) -> ClientExecutionRecord:
-        record = self.service.state_repository.get(execution_id)
+        record = self._get_execution(execution_id)
         if record is None:
             raise CockpitControlError("Execution was not found")
         if record.state != "FAILED":
@@ -44,10 +44,16 @@ class ExecutionControls:
         self._unsupported(execution_id, "Cancel")
 
     def inspect(self, execution_id: str) -> ClientExecutionRecord:
-        record = self.service.state_repository.get(execution_id)
+        record = self._get_execution(execution_id)
         if record is None:
             raise CockpitControlError("Execution was not found")
         return record
+
+    def _get_execution(self, execution_id: str) -> ClientExecutionRecord | None:
+        lookup = getattr(self.service, "get_execution", None)
+        if lookup is not None:
+            return lookup(execution_id)
+        return self.service.state_repository.get(execution_id)
 
     def _unsupported(self, execution_id: str, command: str) -> None:
         self.inspect(execution_id)
