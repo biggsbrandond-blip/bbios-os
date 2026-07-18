@@ -59,7 +59,9 @@ Private methods such as `_read()` and `_write()` are implementation details. The
 
 ## 8. Canonical Data-Transfer Approach
 
-Domain data should cross stable internal boundaries as dataclasses or typed records where they already exist. Dictionaries are acceptable at HTTP request/response boundaries, prototype compatibility paths, flexible metadata fields, and legacy task data.
+Domain data should cross stable internal boundaries as dataclasses or typed records where they already exist. Dictionaries are acceptable at HTTP request/response boundaries, prototype compatibility paths, flexible metadata fields, repository records whose JSON shape is still the public compatibility format, and legacy callers.
+
+Task creation and update now have typed service input models in `bbi_os/task_management/models.py`. `TaskService` still accepts dictionary payloads from handlers and adapters, translates them to `TaskCreateRequest` or `TaskUpdateRequest`, and persists the same dictionary task records.
 
 Existing JSON file structures must not change without a migration plan.
 

@@ -3,10 +3,10 @@
 ## 1. Document Control
 
 - Document: Service Contracts
-- Phase: 2E Service Layer Contract Standardization
+- Phase: 2F Typed Service Boundary Models
 - Branch: `phase-2/repository-contract-cleanup`
 - Baseline before Phase 2E: commit `2406604`, 113 tests passing
-- Scope: service-layer contracts, dependency clarity, and compatibility behavior
+- Scope: service-layer contracts, dependency clarity, typed task input models, and compatibility behavior
 - Out of scope: PostgreSQL, SQLAlchemy, Alembic, authentication redesign, deployment, route changes, response-envelope changes, repository format changes, DTO migration, and unit-of-work implementation
 
 ## 2. Contract Principles
@@ -22,7 +22,7 @@
 
 | Component | Module | Responsibility | Constructor Dependencies | Repository Use | Other Services | Public Methods | Inputs | Returns | Missing-Record Behavior | Exceptions | Compatibility | Direct Persistence | Module-Level Instance | Tests | Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `TaskService` | `bbi_os/task_management/service.py` | Task CRUD business rules | `JsonTaskRepository` | Public `save`, `list`, `get`, `delete` | None | `create`, `list`, `get`, `update`, `delete` | Dict task payloads, task id strings | Task dictionaries or `None` for delete | Raises `TaskNotFoundError` through `_find` or delete | `ValidationError`, `TaskNotFoundError` | Dictionary task contract retained | No | No | `tests/test_task_service.py`, `tests/test_task_api.py`, adapter tests | Low |
+| `TaskService` | `bbi_os/task_management/service.py` | Task CRUD business rules | `JsonTaskRepository` | Public `save`, `list`, `get`, `delete` | None | `create`, `create_task`, `list`, `get`, `update`, `update_task`, `delete` | Dict task payloads or `TaskCreateRequest`/`TaskUpdateRequest`, task id strings | Task dictionaries or `None` for delete | Raises `TaskNotFoundError` through `_find` or delete | `ValidationError`, `TaskNotFoundError` | Dictionary task contract retained; typed service input path added | No | No | `tests/test_task_service.py`, `tests/test_task_api.py`, `tests/test_task_boundary_models.py`, adapter tests | Low |
 | `ClientManagementService` | `bbi_os/cockpit/client_management.py` | Client creation/listing and plan assignment | `EntityRepository`, `ClientPlanRegistry` | Public `save`, `list`, `delete`; plan `assign`, `plan_for` | None | `create`, `list` | Dict client payloads | Client dictionaries | Not exposed by public `get`; create rolls back entity on plan failure | `InvalidClient`, propagated persistence errors | `/clients` and `/v1/clients` handler contract retained | No | No | `bbi_os/cockpit/tests/test_client_management.py`, adapter tests | Low |
 | `ClientExecutionService` | `bbi_os/client_execution/service.py` | Client execution orchestration and access checks | `EntityRepository`, `ClientExecutionRouter`, `ClientExecutionEngine`, `ExecutionStateRepository` | Public client `get`; state `latest_for_client`, `get` through `get_execution` | `ClientExecutionEngine` | `start`, `schedule`, `status`, `get_execution` | Dict execution payloads, client id, execution id | `ClientExecutionRecord` or `None` from `get_execution` | `status` raises `ExecutionNotFound`; `get_execution` returns `None` | Execution auth/client/request errors | Existing status behavior retained | No | No | `bbi_os/client_execution/tests/test_execution.py`, `tests/test_service_contracts.py` | Low |
 | `ClientExecutionEngine` | `bbi_os/client_execution/engine.py` | Schedule/execute records and transition state | `ClientWorkflowExecutor`, `ExecutionStateRepository` | Public `save` through state machine/repository | `ClientWorkflowExecutor`, `ExecutionStateMachine` | `schedule`, `execute` | `ClientExecutionRequest` | `ClientExecutionRecord` | Not applicable | `ConcurrentExecution`; workflow failures recorded as failed records | Current compensation behavior retained | No | No | execution tests | Medium |
@@ -59,12 +59,14 @@
 
 ## 5. Compatibility Retained
 
+- `TaskService.create()` and `TaskService.update()` still accept dictionary payloads from existing handlers and adapters.
+- `TaskService.create_task()` and `TaskService.update_task()` provide typed task input paths using `TaskCreateRequest` and `TaskUpdateRequest`.
 - `ClientExecutionService.status(client_id)` still validates client access and raises `ExecutionNotFound` when no latest client execution exists.
 - `ExecutionControls.inspect()` and retry lookup still raise `CockpitControlError("Execution was not found")` for missing execution ids.
 - Existing execution-service test doubles that expose `state_repository` but not `get_execution()` remain compatible.
 - `ExecutionControls.retry()` still restarts failed records through `ClientExecutionService.start()` with the existing payload shape.
 - `ClientMonetizationService` four-argument construction still creates `PlanEnforcer(usage)` and `BillingSummaryGenerator(usage)`.
-- No route, response envelope, dataclass, dictionary payload, JSON schema, or persistence path changed.
+- No route, response envelope, external dictionary payload, JSON schema, or persistence path changed.
 
 ## 6. Deferred Service-Layer Debt
 
@@ -73,6 +75,8 @@
 3. Secret and credential reads in integration services still use environment variables directly pending security/configuration governance.
 4. Workflow and template services still exchange dictionaries at several boundaries; broad DTO migration is deferred.
 5. Shared service composition helpers for runtime adapters are deferred until richer `/v1/*` FastAPI composition is approved.
+6. Client management create payloads remain dictionary-based pending a separate typed-boundary approval.
+7. Task repository records remain dictionaries until a repository record migration is separately approved.
 
 ## 7. Phase 2E Exit Criteria
 
@@ -82,3 +86,11 @@
 - Monetization helper collaborators can be injected for composition and testing while defaults remain compatible.
 - Focused regression tests cover the changed service contracts.
 - Full unittest discovery, compileall, and diff checks pass.
+
+## 8. Phase 2F Implemented Changes
+
+- Added `TaskCreateRequest` and `TaskUpdateRequest` in `bbi_os/task_management/models.py`.
+- Updated `TaskService.create()` and `TaskService.update()` to translate legacy dictionaries into typed request models while preserving validation messages.
+- Added typed `TaskService.create_task()` and `TaskService.update_task()` operations for internal service callers.
+- Preserved handler, FastAPI adapter, repository, JSON persistence, route, response-envelope, and exception behavior.
+- Recorded the complete typed-boundary inventory in `docs/TYPED_BOUNDARY_MODELS.md`.

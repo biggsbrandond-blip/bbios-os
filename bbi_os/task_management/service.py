@@ -4,11 +4,18 @@ from uuid import uuid4
 
 from bbi_os.observability import get_observability
 from bbi_os.task_management.errors import TaskNotFoundError, ValidationError
+from bbi_os.task_management.models import (
+    TaskCreateRequest,
+    TaskUpdateRequest,
+    UPDATABLE_FIELDS,
+    VALID_STATUSES,
+    validate_task_fields,
+)
 from bbi_os.task_management.repository import JsonTaskRepository, Task
 
 
-VALID_STATUSES = {"pending", "in-progress", "complete"}
-UPDATABLE_FIELDS = {"title", "description", "status"}
+TaskCreateInput = Dict[str, Any] | TaskCreateRequest
+TaskUpdateInput = Dict[str, Any] | TaskUpdateRequest
 
 
 def _timestamp() -> str:
@@ -19,14 +26,20 @@ class TaskService:
     def __init__(self, repository: JsonTaskRepository) -> None:
         self.repository = repository
 
-    def create(self, data: Dict[str, Any]) -> Task:
-        self._validate_fields(data, required=UPDATABLE_FIELDS)
+    def create(self, data: TaskCreateInput) -> Task:
+        request = (
+            data if isinstance(data, TaskCreateRequest)
+            else TaskCreateRequest.from_dict(data)
+        )
+        return self.create_task(request)
+
+    def create_task(self, request: TaskCreateRequest) -> Task:
         now = _timestamp()
         task: Task = {
             "id": str(uuid4()),
-            "title": data["title"],
-            "description": data["description"],
-            "status": data["status"],
+            "title": request.title,
+            "description": request.description,
+            "status": request.status,
             "created_at": now,
             "updated_at": now,
         }
@@ -48,12 +61,16 @@ class TaskService:
             raise TaskNotFoundError(f"Task '{task_id}' was not found")
         return task
 
-    def update(self, task_id: str, data: Dict[str, Any]) -> Task:
-        if not data:
-            raise ValidationError("At least one field is required")
-        self._validate_fields(data, required=set())
+    def update(self, task_id: str, data: TaskUpdateInput) -> Task:
+        request = (
+            data if isinstance(data, TaskUpdateRequest)
+            else TaskUpdateRequest.from_dict(data)
+        )
+        return self.update_task(task_id, request)
+
+    def update_task(self, task_id: str, request: TaskUpdateRequest) -> Task:
         task = self._find(task_id)
-        task.update(data)
+        task.update(request.to_dict())
         task["updated_at"] = _timestamp()
         saved_task = self.repository.save(task)
         get_observability().task_event("task_updated", task_id)
@@ -66,16 +83,4 @@ class TaskService:
 
     @staticmethod
     def _validate_fields(data: Dict[str, Any], required: set) -> None:
-        if not isinstance(data, dict):
-            raise ValidationError("Request body must be a JSON object")
-        unknown = set(data) - UPDATABLE_FIELDS
-        if unknown:
-            raise ValidationError(f"Unknown field(s): {', '.join(sorted(unknown))}")
-        missing = required - set(data)
-        if missing:
-            raise ValidationError(f"Missing field(s): {', '.join(sorted(missing))}")
-        for field in ("title", "description"):
-            if field in data and not isinstance(data[field], str):
-                raise ValidationError(f"'{field}' must be a string")
-        if "status" in data and data["status"] not in VALID_STATUSES:
-            raise ValidationError("'status' must be pending, in-progress, or complete")
+        validate_task_fields(data, required=required)

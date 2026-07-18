@@ -237,12 +237,12 @@ No PostgreSQL, SQLAlchemy, Alembic, new authentication system, Docker, CI/CD, de
 ### RC-DATA-001 - Mixed dictionaries and typed dataclasses
 
 - Location: `bbi_os/domain.py`, `bbi_os/client_execution/models.py`, `bbi_os/workflows/models.py`, `bbi_os/client_monetization/models.py`, `bbi_os/task_management/service.py`, `bbi_os/cockpit/service.py`.
-- Current behavior: Stable domains use dataclasses with `to_dict()`/`from_dict()` or `to_record()`/`from_record()`; task and cockpit prototype paths still use dictionaries.
+- Current behavior: Stable domains use dataclasses with `to_dict()`/`from_dict()` or `to_record()`/`from_record()`; task create/update service inputs now use `TaskCreateRequest` and `TaskUpdateRequest`; task records and cockpit prototype paths still use dictionaries.
 - Intended contract: Typed objects should protect domain boundaries; dictionaries are acceptable at request/response and flexible metadata boundaries.
 - Risk: Medium. Over-converting could break existing response shapes.
 - Recommended action: Add types only where behavior is already stable.
-- Safe now: Deferred except small annotations.
-- Tests protecting behavior: full unittest suite.
+- Safe now: Implemented for task create/update service inputs only.
+- Tests protecting behavior: `tests/test_task_boundary_models.py` and full unittest suite.
 
 ### RC-DATA-002 - Timestamp formats are assumed strings
 
@@ -360,12 +360,14 @@ No PostgreSQL, SQLAlchemy, Alembic, new authentication system, Docker, CI/CD, de
 - Implemented: allow optional monetization helper injection while preserving existing `ClientMonetizationService` default construction.
 - Candidate: add explicit docstrings for compatibility routes.
 - Implemented: add route inventory tests for currently supported FastAPI and focused adapter paths.
+- Implemented: add typed task create/update service input models while preserving dictionary callers and task JSON records.
 - Candidate: add package exports only for already-used public classes after approval.
 
 ## 18. Deferred Cleanup Candidates
 
 - Continue monitoring canonical FastAPI app creation through runtime contract tests.
 - Create versioned FastAPI route adapters for deferred `/v1/cockpit/*`, workflow, execution, monetization, onboarding, pipeline, integration, webhook, and workflow-template handlers after runtime composition is approved.
+- Continue typed-boundary cleanup for client management and cockpit compatibility payloads only after a narrow target is approved.
 - Centralize secret-related environment access.
 - Extract shared JSON repository file utilities.
 - Document and test frontend/backend route contracts end to end.
