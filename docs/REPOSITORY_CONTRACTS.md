@@ -53,6 +53,8 @@ Repositories expose public methods for supported reads and writes. Current publi
 
 Single-record JSON repositories with unambiguous identity keys expose `exists()` and `count()` as non-mutating public read helpers. This currently includes `JsonTaskRepository`, `JsonEntityRepository`, and `ExecutionStateRepository`.
 
+Repository protocol ownership is split between the existing `EntityRepository` protocol in `bbi_os/entity_repository.py` and the Phase 2G persistence contracts in `bbi_os/persistence.py`. `TaskRepository`, `ExecutionStateRepositoryContract`, `ClientPlanRepository`, and `UsageRepository` describe the public repository methods used by services while keeping JSON repositories as the default runtime implementations.
+
 Domain-specific repositories and registries may retain clearer domain method names where generic CRUD names would be ambiguous. Examples include workflow definitions versus instances, workflow template lineage, integration connectors versus webhooks, plan assignment lookup, usage summaries, and in-memory route registries.
 
 Private methods such as `_read()` and `_write()` are implementation details. They may remain inside repository implementations while JSON storage is current, but application services must use public methods.
@@ -117,7 +119,9 @@ New cleanup work should add focused unittest coverage when it changes a public c
 
 ## 16. Persistence Migration Expectations
 
-PostgreSQL, SQLAlchemy, and Alembic are planned future work, not current implementation. Persistence migration must begin with repository parity tests, transaction ownership, schema decisions, migration rollback planning, and compatibility validation.
+PostgreSQL, SQLAlchemy, and Alembic are planned future work, not current implementation. Persistence migration must begin by implementing the approved repository protocols with parity tests, transaction ownership, schema decisions, migration rollback planning, and compatibility validation.
+
+The current runtime persistence implementation remains JSON only. The Phase 2G abstraction layer identifies where future persistence implementations can be inserted, but it does not add database code, alter JSON schemas, or change filesystem behavior.
 
 ## 17. Frontend Integration Expectations
 

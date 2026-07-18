@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 from uuid import uuid4
 
 from bbi_os.observability import get_observability
+from bbi_os.persistence import TaskRecord, TaskRepository
 from bbi_os.task_management.errors import TaskNotFoundError, ValidationError
 from bbi_os.task_management.models import (
     TaskCreateRequest,
@@ -11,7 +12,6 @@ from bbi_os.task_management.models import (
     VALID_STATUSES,
     validate_task_fields,
 )
-from bbi_os.task_management.repository import JsonTaskRepository, Task
 
 
 TaskCreateInput = Dict[str, Any] | TaskCreateRequest
@@ -23,19 +23,19 @@ def _timestamp() -> str:
 
 
 class TaskService:
-    def __init__(self, repository: JsonTaskRepository) -> None:
+    def __init__(self, repository: TaskRepository) -> None:
         self.repository = repository
 
-    def create(self, data: TaskCreateInput) -> Task:
+    def create(self, data: TaskCreateInput) -> TaskRecord:
         request = (
             data if isinstance(data, TaskCreateRequest)
             else TaskCreateRequest.from_dict(data)
         )
         return self.create_task(request)
 
-    def create_task(self, request: TaskCreateRequest) -> Task:
+    def create_task(self, request: TaskCreateRequest) -> TaskRecord:
         now = _timestamp()
-        task: Task = {
+        task: TaskRecord = {
             "id": str(uuid4()),
             "title": request.title,
             "description": request.description,
@@ -47,28 +47,28 @@ class TaskService:
         get_observability().task_event("task_created", saved_task["id"])
         return saved_task
 
-    def list(self) -> List[Task]:
+    def list(self) -> List[TaskRecord]:
         return self.repository.list()
 
-    def get(self, task_id: str) -> Task:
+    def get(self, task_id: str) -> TaskRecord:
         task = self._find(task_id)
         get_observability().task_event("task_retrieved", task_id)
         return task
 
-    def _find(self, task_id: str) -> Task:
+    def _find(self, task_id: str) -> TaskRecord:
         task = self.repository.get(task_id)
         if task is None:
             raise TaskNotFoundError(f"Task '{task_id}' was not found")
         return task
 
-    def update(self, task_id: str, data: TaskUpdateInput) -> Task:
+    def update(self, task_id: str, data: TaskUpdateInput) -> TaskRecord:
         request = (
             data if isinstance(data, TaskUpdateRequest)
             else TaskUpdateRequest.from_dict(data)
         )
         return self.update_task(task_id, request)
 
-    def update_task(self, task_id: str, request: TaskUpdateRequest) -> Task:
+    def update_task(self, task_id: str, request: TaskUpdateRequest) -> TaskRecord:
         task = self._find(task_id)
         task.update(request.to_dict())
         task["updated_at"] = _timestamp()

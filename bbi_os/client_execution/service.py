@@ -13,9 +13,9 @@ from bbi_os.client_execution.models import (
     ClientExecutionRequest,
 )
 from bbi_os.client_execution.router import ClientExecutionRouter
-from bbi_os.client_execution.state import ExecutionStateRepository
 from bbi_os.entity_repository import EntityRepository
 from bbi_os.observability import current_request_context, get_observability
+from bbi_os.persistence import ExecutionStateRepositoryContract
 
 
 class ClientExecutionService:
@@ -24,7 +24,7 @@ class ClientExecutionService:
         clients: EntityRepository,
         router: ClientExecutionRouter,
         engine: ClientExecutionEngine,
-        state_repository: ExecutionStateRepository,
+        state_repository: ExecutionStateRepositoryContract,
     ) -> None:
         self.clients = clients
         self.router = router
@@ -94,4 +94,3 @@ class ClientExecutionService:
                 "rollback_actions": list(record.rollback_actions),
             },
         )
-

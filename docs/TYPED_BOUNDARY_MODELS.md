@@ -83,6 +83,8 @@ Typed callers can use `TaskService.create_task()` and `TaskService.update_task()
 
 Handler and FastAPI adapter functions still pass dictionaries from request bodies. Response envelopes are still owned by `TaskRequestHandler` and `bbi_os/api/v1.py`. `JsonTaskRepository` still stores and returns dictionaries, and no JSON schema, file path, ordering, locking, or mutation semantics changed.
 
+Phase 2G preserves this typed-boundary decision. `TaskService` now depends on the `TaskRepository` protocol from `bbi_os/persistence.py`, but the protocol still uses the existing dictionary task record shape so typed service inputs do not imply a repository record migration.
+
 ## 9. Remaining Typed-Boundary Debt
 
 1. Client management create payloads remain dictionary-based in `ClientManagementService.create()`.

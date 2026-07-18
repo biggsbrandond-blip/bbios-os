@@ -9,18 +9,17 @@ from bbi_os.client_monetization.errors import (
 from bbi_os.client_monetization.metering import PlanEnforcer
 from bbi_os.client_monetization.models import UsageEvent, UsageEventRequest
 from bbi_os.client_monetization.pricing_engine import PricingEngine
-from bbi_os.client_monetization.registry import ClientPlanRegistry
-from bbi_os.client_monetization.usage_tracker import UsageTracker
 from bbi_os.entity_repository import EntityRepository
 from bbi_os.observability import current_request_context, get_observability, timestamp
+from bbi_os.persistence import ClientPlanRepository, UsageRepository
 
 
 class ClientMonetizationService:
     def __init__(
         self,
         clients: EntityRepository,
-        plans: ClientPlanRegistry,
-        usage: UsageTracker,
+        plans: ClientPlanRepository,
+        usage: UsageRepository,
         pricing: PricingEngine,
         enforcer: Optional[PlanEnforcer] = None,
         billing: Optional[BillingSummaryGenerator] = None,
@@ -115,4 +114,3 @@ class ClientMonetizationService:
             raise MonetizationAuthenticationFailed("Authentication required")
         if self.clients.get(client_id) is None:
             raise MonetizationClientNotFound("Client not found")
-
