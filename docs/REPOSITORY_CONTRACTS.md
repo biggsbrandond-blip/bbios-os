@@ -47,7 +47,11 @@ Compatibility services may retain optional constructor dependencies only when pr
 
 ## 7. Canonical Repository Boundary
 
-Repositories expose public methods for supported reads and writes. Current public repository methods include patterns such as `list()`, `get()`, `save()`, `delete()`, `latest_for_client()`, `list_for_client()`, `save_definition()`, `get_definition()`, `save_instance()`, and `get_instance()`.
+Repositories expose public methods for supported reads and writes. Current public repository methods include patterns such as `list()`, `get()`, `exists()`, `count()`, `save()`, `delete()`, `latest_for_client()`, `list_for_client()`, `save_definition()`, `get_definition()`, `save_instance()`, and `get_instance()`.
+
+Single-record JSON repositories with unambiguous identity keys expose `exists()` and `count()` as non-mutating public read helpers. This currently includes `JsonTaskRepository`, `JsonEntityRepository`, and `ExecutionStateRepository`.
+
+Domain-specific repositories and registries may retain clearer domain method names where generic CRUD names would be ambiguous. Examples include workflow definitions versus instances, workflow template lineage, integration connectors versus webhooks, plan assignment lookup, usage summaries, and in-memory route registries.
 
 Private methods such as `_read()` and `_write()` are implementation details. They may remain inside repository implementations while JSON storage is current, but application services must use public methods.
 

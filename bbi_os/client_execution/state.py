@@ -73,6 +73,14 @@ class ExecutionStateRepository:
             item = self._read().get(execution_id)
         return ClientExecutionRecord.from_dict(item) if item else None
 
+    def exists(self, execution_id: str) -> bool:
+        with self._lock:
+            return execution_id in self._read()
+
+    def count(self) -> int:
+        with self._lock:
+            return len(self._read())
+
     def list(self) -> List[ClientExecutionRecord]:
         with self._lock:
             return [

@@ -29,6 +29,14 @@ class JsonTaskRepository:
             self._log_operation("repository_task_read", task_id)
             return task
 
+    def exists(self, task_id: str) -> bool:
+        with self._lock:
+            return task_id in self._read()
+
+    def count(self) -> int:
+        with self._lock:
+            return len(self._read())
+
     def save(self, task: Task) -> Task:
         with self._lock:
             tasks = self._read()

@@ -16,6 +16,10 @@ class EntityRepository(Protocol):
 
     def get(self, entity_id: str) -> Optional[BaseEntity]: ...
 
+    def exists(self, entity_id: str) -> bool: ...
+
+    def count(self) -> int: ...
+
     def save(self, entity: BaseEntity) -> BaseEntity: ...
 
     def delete(self, entity_id: str) -> bool: ...
@@ -46,6 +50,14 @@ class JsonEntityRepository:
             entity = BaseEntity.from_record(record)
             self._event("entity_retrieved", entity_id)
             return entity
+
+    def exists(self, entity_id: str) -> bool:
+        with self._lock:
+            return entity_id in self._read()
+
+    def count(self) -> int:
+        with self._lock:
+            return len(self._read())
 
     def save(self, entity: BaseEntity) -> BaseEntity:
         self._validate_type(entity)

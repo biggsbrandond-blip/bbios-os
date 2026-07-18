@@ -172,6 +172,26 @@ No PostgreSQL, SQLAlchemy, Alembic, new authentication system, Docker, CI/CD, de
 - Safe now: Yes, implemented.
 - Tests protecting behavior: new `ClientExecutionTests.test_state_repository_lists_all_execution_records`.
 
+### RC-REP-004 - Single-record repositories lacked standard presence/count reads
+
+- Location: `bbi_os/task_management/repository.py`, `bbi_os/entity_repository.py`, `bbi_os/client_execution/state.py`.
+- Current behavior before cleanup: `JsonTaskRepository`, `JsonEntityRepository`, and `ExecutionStateRepository` exposed public entity reads through `get()` and collection reads through `list()`, but callers had no consistent public `exists()` or `count()` helpers.
+- Intended contract: Single-record repositories with unambiguous identity keys should expose non-mutating public read helpers for presence and count checks.
+- Risk: Low. The new methods read the same JSON-backed mappings under the existing repository locks and do not alter write behavior, return envelopes, JSON schema, file layout, service behavior, or route behavior.
+- Recommended action: Use `exists()` and `count()` for future presence/count needs instead of reaching into private storage helpers.
+- Safe now: Yes, implemented for the three unambiguous JSON repositories.
+- Tests protecting behavior: `tests/test_repository_contracts.py`.
+
+### RC-REP-005 - Domain-specific repositories intentionally keep explicit names
+
+- Location: `bbi_os/workflows/repository.py`, `bbi_os/workflows/templates.py`, `bbi_os/client_monetization/registry.py`, `bbi_os/client_monetization/usage_tracker.py`, `bbi_os/integrations/registry.py`, `bbi_os/client_onboarding/registry.py`, `bbi_os/client_pipeline/templates/registry.py`, `bbi_os/entity_routing.py`.
+- Current behavior: These repositories and registries expose domain-specific methods such as `save_definition()`, `get_instance()`, `create_connector()`, `register_webhook()`, `plan_for()`, `assign()`, `record()`, `for_client()`, `register()`, and `resolve()`.
+- Intended contract: Public repository access should remain explicit when a generic CRUD verb would obscure which underlying collection or domain concept is being addressed.
+- Risk: Medium if generic aliases are added without naming and exception semantics being approved.
+- Recommended action: Defer generic aliases for multi-collection and registry-style components until their repository contracts are specified individually.
+- Safe now: Documentation only.
+- Tests protecting behavior: workflow, template, integration, monetization, onboarding, pipeline, and route-registry tests.
+
 ### RC-REP-002 - JSON repositories duplicate atomic file operations
 
 - Location: `bbi_os/entity_repository.py`, `bbi_os/task_management/repository.py`, `bbi_os/client_execution/state.py`, `bbi_os/workflows/repository.py`, `bbi_os/workflows/templates.py`, `bbi_os/client_monetization/registry.py`, `bbi_os/client_monetization/usage_tracker.py`, `bbi_os/integrations/registry.py`.
@@ -283,7 +303,7 @@ No PostgreSQL, SQLAlchemy, Alembic, new authentication system, Docker, CI/CD, de
 - HTTP contract: `/cockpit/*` prototype routes, FastAPI adapter routes for stable `/v1/tasks` and client-management paths, and remaining internal handler routes.
 - Client contract: prototype `client_name`/`plan` payload and richer client-management `name`/`plan` payload.
 - Response contract: direct prototype dictionaries and standardized internal envelopes.
-- Repository read contract: public typed reads and private raw `_read()` internals.
+- Repository read contract: public typed reads, standardized `exists()` and `count()` on single-record JSON repositories, domain-specific public methods for multi-collection registries, and private raw `_read()` internals.
 
 ## 13. Compatibility Layers
 
@@ -315,6 +335,7 @@ No PostgreSQL, SQLAlchemy, Alembic, new authentication system, Docker, CI/CD, de
 ## 17. Safe Cleanup Candidates
 
 - Implemented: add `ExecutionStateRepository.list()` and update `CockpitService` to use it.
+- Implemented: add public `exists()` and `count()` helpers to `JsonTaskRepository`, `JsonEntityRepository`, and `ExecutionStateRepository`.
 - Candidate: add explicit docstrings for compatibility routes.
 - Implemented: add route inventory tests for currently supported FastAPI and focused adapter paths.
 - Candidate: add package exports only for already-used public classes after approval.
