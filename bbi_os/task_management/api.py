@@ -12,6 +12,7 @@ from bbi_os.auth import (
 )
 from bbi_os.entity_routing import EntityRouteRegistry
 from bbi_os.observability import (
+    REQUEST_ID_HEADER,
     begin_request,
     current_request_id,
     end_request,
@@ -152,7 +153,7 @@ class TaskRequestHandler(BaseHTTPRequestHandler):
         observer = get_observability()
         endpoint = urlparse(self.path).path
         started_at = timestamp()
-        token = begin_request(started_at)
+        token = begin_request(started_at, request_id=self.headers.get(REQUEST_ID_HEADER))
         summary_token = begin_execution_summary()
         started = time.perf_counter()
         self._response_status = None

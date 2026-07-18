@@ -10,6 +10,9 @@ from uuid import uuid4
 from bbi_os.response_contract import record_event
 
 
+REQUEST_ID_HEADER = "X-Request-ID"
+MAX_REQUEST_ID_LENGTH = 128
+
 _request_context: ContextVar[Dict[str, str]] = ContextVar(
     "request_context",
     default={
@@ -33,10 +36,29 @@ def current_request_context() -> Dict[str, str]:
     return dict(_request_context.get())
 
 
-def begin_request(request_timestamp: Optional[str] = None) -> Token:
+def _is_valid_request_id(value: str) -> bool:
+    return (
+        bool(value)
+        and len(value) <= MAX_REQUEST_ID_LENGTH
+        and all(character.isprintable() and not character.isspace() for character in value)
+    )
+
+
+def normalize_request_id(request_id: Optional[str] = None) -> str:
+    if request_id is not None:
+        normalized = request_id.strip()
+        if _is_valid_request_id(normalized):
+            return normalized
+    return str(uuid4())
+
+
+def begin_request(
+    request_timestamp: Optional[str] = None,
+    request_id: Optional[str] = None,
+) -> Token:
     return _request_context.set(
         {
-            "request_id": str(uuid4()),
+            "request_id": normalize_request_id(request_id),
             "user_id": "anonymous",
             "role": "readonly",
             "request_timestamp": request_timestamp or timestamp(),

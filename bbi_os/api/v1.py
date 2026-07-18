@@ -12,6 +12,7 @@ from bbi_os.cockpit.client_management import (
 )
 from bbi_os.entity_repository import JsonEntityRepository
 from bbi_os.observability import (
+    REQUEST_ID_HEADER,
     begin_request,
     current_request_id,
     end_request,
@@ -147,7 +148,7 @@ def _dispatch_handler(
     headers: Mapping[str, str],
     body: Optional[Dict[str, Any]] = None,
 ) -> Tuple[int, Dict[str, Any]]:
-    request_token = begin_request()
+    request_token = begin_request(request_id=headers.get(REQUEST_ID_HEADER))
     summary_token = begin_execution_summary()
     request = AdapterRequest(method, path, headers, body)
     set_request_identity("anonymous", "readonly")
