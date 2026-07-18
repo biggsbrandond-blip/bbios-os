@@ -194,11 +194,7 @@ class CockpitService:
 
     def _execution_records(self) -> List[ClientExecutionRecord]:
         self._require_rich("executions", self._execution_repository)
-        records = self._execution_repository._read()
-        return [
-            ClientExecutionRecord.from_dict(item)
-            for item in records.values()
-        ]
+        return self._execution_repository.list()
 
     def _execution_records_for_client(self, client_id: str) -> List[ClientExecutionRecord]:
         if hasattr(self._execution_repository, "list_for_client"):

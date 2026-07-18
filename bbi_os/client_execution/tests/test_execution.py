@@ -360,6 +360,22 @@ class ClientExecutionTests(unittest.TestCase):
             scheduled["data"]["execution_id"], retrieved["data"]["execution_id"]
         )
 
+    def test_state_repository_lists_all_execution_records(self) -> None:
+        first = self.engine.schedule(
+            ClientExecutionRequest.from_dict(self.request("happy", "scheduled"))
+        )
+        second = self.engine.schedule(
+            ClientExecutionRequest.from_dict(self.request("happy", "recurring"))
+        )
+
+        records = self.state.list()
+
+        self.assertEqual(
+            {first.execution_id, second.execution_id},
+            {record.execution_id for record in records},
+        )
+        self.assertTrue(all(hasattr(record, "to_dict") for record in records))
+
 
 if __name__ == "__main__":
     unittest.main()

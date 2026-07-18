@@ -73,6 +73,13 @@ class ExecutionStateRepository:
             item = self._read().get(execution_id)
         return ClientExecutionRecord.from_dict(item) if item else None
 
+    def list(self) -> List[ClientExecutionRecord]:
+        with self._lock:
+            return [
+                ClientExecutionRecord.from_dict(item)
+                for item in self._read().values()
+            ]
+
     def latest_for_client(self, client_id: str) -> Optional[ClientExecutionRecord]:
         with self._lock:
             matches = [
