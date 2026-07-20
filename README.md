@@ -1,184 +1,111 @@
 # BBIOS OS
 
-BBIOS OS is a modular business-operations platform built with Python, FastAPI, and React.
+BBIOS OS is a modular FastAPI backend system designed as a backend engineering portfolio project. It models a business operating system for client management, task management, workflow execution, integrations, monetization concepts, observability, and an administrative Cockpit API surface.
 
-The project explores how backend services, client operations, workflow execution, task management, integrations, monetization, observability, and an administrative Cockpit interface can be organized within a layered software architecture.
+The project focuses on production-style backend architecture: clear layers, stable service boundaries, repository contracts, operational readiness, structured error handling, and incremental evolution without broad rewrites.
 
-BBIOS OS began as an internal operating-system concept for Biggs Bold Ink and now serves as my primary backend engineering portfolio project.
+BBIOS OS is not presented as a production SaaS platform. It is a portfolio-grade backend system that demonstrates disciplined engineering practices and a path from prototype architecture toward production readiness.
 
----
-
-## Project Status
-
-BBIOS OS is an actively developed portfolio and learning project.
-
-The current implementation demonstrates modular backend architecture, API routing, service-layer separation, frontend integration, automated testing, and prototype business workflows.
-
-It is not presented as a production-ready commercial platform.
-
----
-
-## Current Capabilities
-
-- Client onboarding and management
-- UUID-based client identification
-- Client retrieval and search
-- Client pipeline handling
-- Workflow and execution services
-- Task-management services
-- Request identity context for internal handlers
-- Integration management
-- Monetization and usage concepts
-- Execution logging and observability
-- Template-driven system generation
-- Administrative Cockpit interface
-- Automated tests across core system modules
-
----
-
-## Architecture
+## Architecture Diagram
 
 ```text
-User or Client
-      |
-      v
-React Cockpit UI
-      |
-      v
-FastAPI API Layer
-      |
-      v
-Router Layer
-      |
-      v
-Service and Domain Layers
-      |
-      +---- Client Onboarding
-      +---- Client Pipeline
-      +---- Client Execution
-      +---- Client Monetization
-      +---- Task Management
-      +---- Workflows
-      +---- Integrations
-      +---- Templates
-      +---- Observability
-      |
-      v
-Prototype Repository and Data Layer
+Client / API Consumer
+        |
+        v
+FastAPI Application
+        |
+        v
+Middleware / Operational Layer
+request correlation, health, readiness, metrics, error handling
+        |
+        v
+Routers and Versioned API Adapters
+        |
+        v
+Handlers / Request Adapters
+        |
+        v
+Application Services
+        |
+        v
+Repository Protocols
+        |
+        v
+JSON Repository Implementations
+        |
+        v
+JSON Persistence
 ```
 
-### Router Layer
+The current runtime uses JSON persistence only. The architecture is intentionally shaped so future persistence implementations can be introduced behind stable repository contracts.
 
-The router layer:
+## Core Design Principles
 
-- receives HTTP requests;
-- validates and routes request data;
-- calls the appropriate service;
-- returns structured API responses;
-- avoids holding core business logic.
+### Layered Architecture
 
-### Service and Domain Layers
+BBIOS OS separates HTTP concerns, middleware, routers, handlers, application services, repository contracts, and persistence. This keeps framework code away from core business behavior and makes the system easier to reason about.
 
-The service and domain layers:
+### Service / Repository Separation
 
-- contain business rules;
-- coordinate client and workflow operations;
-- manage execution behavior;
-- organize reusable application logic;
-- separate business concerns from HTTP handling.
+Services coordinate application behavior. Repositories own persistence access. Service code depends on stable repository contracts rather than directly managing storage details.
 
-### Repository and Data Layer
+### Protocol-Based Contracts
 
-The current prototype uses repository and in-memory data concepts while the project continues toward persistent database integration.
+Repository and service boundaries use narrow contracts to support substitution, testing, and future persistence migration without changing route behavior.
 
----
+### Observability-First Design
 
-## Repository Structure
+Operational behavior is treated as a first-class backend concern. The system includes request correlation, structured logs, centralized error responses, liveness checks, readiness checks, and metrics.
 
-```text
-bbios-os/
-|
-|-- bbi_os/
-|   |-- client_execution/
-|   |-- client_monetization/
-|   |-- client_onboarding/
-|   |-- client_pipeline/
-|   |-- cockpit/
-|   |-- generator/
-|   |-- integrations/
-|   |-- task_management/
-|   |-- templates/
-|   |-- workflows/
-|   |-- auth.py
-|   |-- domain.py
-|   |-- entity_repository.py
-|   |-- entity_routing.py
-|   |-- observability.py
-|   |-- response_contract.py
-|
-|-- cockpit-ui/
-|   |-- src/
-|   |-- package.json
-|   |-- vite.config.js
-|   |-- .env.example
-|
-|-- generated_system/
-|
-|-- tests/
-|
-|-- README.md
+### Incremental Architecture Evolution
+
+The project evolves through small, compatibility-preserving phases. Existing routes, response envelopes, JSON persistence behavior, and service contracts are protected while the architecture matures.
+
+## Features
+
+### API Features
+
+- Client management through Cockpit and compatibility routes.
+- Task management with create, list, retrieve, update, and delete operations.
+- Workflow and execution service architecture.
+- Versioned `/v1` API adapter layer.
+- Handler-backed compatibility endpoints for existing client and task flows.
+- Service-layer boundaries for task, execution, monetization, and repository dependencies.
+- Protocol-based repository abstraction over JSON-backed storage.
+
+### Operational Features
+
+- `GET /health` for lightweight process liveness.
+- `GET /health/ready` for readiness checks.
+- `GET /metrics` for JSON operational metrics.
+- `X-Request-ID` request correlation.
+- Inbound request ID reuse when valid.
+- UUID request ID generation when missing or invalid.
+- Response header propagation for request IDs.
+- Centralized exception handling for structured JSON errors.
+- Structured observability logs.
+
+### Current API Surface
+
+Runtime and operational endpoints:
+
+```http
+GET /
+GET /health
+GET /health/ready
+GET /metrics
 ```
 
----
-
-## Cockpit UI
-
-The Cockpit UI is a standalone React frontend for the BBIOS OS Cockpit APIs.
-
-Current interface areas include:
-
-- Overview
-- Clients
-- Client details
-- Executions
-- Execution details
-- Monetization
-- Logs
-- Log details
-
-The frontend uses read-only API requests and includes safe empty states for unavailable or empty responses.
-
----
-
-## Example API Endpoints
-
-### Create Client
+Cockpit endpoints:
 
 ```http
 POST /cockpit/create-client
-```
-
-### Retrieve Client
-
-```http
 GET /cockpit/client/{client_id}
-```
-
-### Search Clients
-
-```http
 GET /cockpit/clients/search
-```
-
-### Test Pipeline
-
-```http
 POST /cockpit/test-pipeline
 ```
 
-Additional versioned Cockpit endpoints are used by the React frontend.
-
-The canonical FastAPI app also exposes handler-backed compatibility routes for:
+Task endpoints:
 
 ```http
 GET /v1/tasks
@@ -186,182 +113,199 @@ POST /v1/tasks
 GET /v1/tasks/{task_id}
 PATCH /v1/tasks/{task_id}
 DELETE /v1/tasks/{task_id}
+```
+
+Client compatibility and versioned endpoints:
+
+```http
 GET /clients
 POST /clients
 GET /v1/clients
 POST /v1/clients
 ```
 
----
+### Structured Error Format
 
-## Example Client Object
+Centralized exception responses use a consistent JSON shape:
 
 ```json
 {
-  "client_id": "uuid",
-  "client_name": "Example Client",
-  "plan": "premium",
-  "created_at": "timestamp"
+  "error": true,
+  "type": "ValidationError",
+  "message": "Example error message",
+  "request_id": "request-id",
+  "timestamp": "2026-07-20T00:00:00Z"
 }
 ```
 
----
+## Testing
 
-## Technology Stack
+The project currently has 137+ automated tests passing.
 
-### Backend
+Coverage includes:
 
-- Python
-- FastAPI
-- Pydantic
-- Uvicorn
+- FastAPI runtime construction;
+- route contract stability;
+- API adapter behavior;
+- service contracts;
+- repository contracts;
+- persistence abstraction;
+- typed task boundary models;
+- request correlation middleware;
+- centralized exception response format;
+- readiness and metrics endpoints;
+- observability behavior;
+- client, task, workflow, integration, execution, monetization, and Cockpit modules.
 
-### Frontend
+Run the test suite:
 
-- JavaScript
-- React
-- Vite
+```bash
+.venv/bin/python -m unittest discover tests
+```
 
-### Testing and Development
+Run a backend compile check:
 
-- Pytest
-- Git
-- GitHub
-- REST APIs
-- Swagger / OpenAPI documentation
+```bash
+.venv/bin/python -m compileall bbi_os
+```
 
----
+## Running the Project
 
-## Run the Backend
-
-From the repository root, run:
+Start the FastAPI backend from the repository root:
 
 ```bash
 uvicorn bbi_os.app:app --reload
 ```
 
-Then open the interactive API documentation:
+The canonical ASGI entry point is:
+
+```text
+bbi_os.app:app
+```
+
+Open the interactive API documentation:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
----
+## Tech Stack
 
-## Run the Cockpit UI
+Backend:
 
-Move into the frontend directory:
+- Python 3.12
+- FastAPI
+- Pydantic
+- Uvicorn
+- JSON file persistence
 
-```bash
-cd cockpit-ui
-```
+Testing and engineering:
 
-Install the frontend dependencies:
+- Python `unittest`
+- `compileall`
+- Git
+- Architecture documentation
+- Architecture decision records
 
-```bash
-npm install
-```
+Frontend prototype:
 
-Start the development server:
+- React
+- Vite
 
-```bash
-npm run dev
-```
-
-By default, the Vite development server proxies `/v1` requests to:
-
-```text
-http://127.0.0.1:8000
-```
-
-For a separately hosted backend, configure:
+## Repository Structure
 
 ```text
-VITE_API_BASE_URL=https://your-bbios-api.example.com
+bbi_os/
+|-- api/
+|-- client_execution/
+|-- client_monetization/
+|-- client_onboarding/
+|-- client_pipeline/
+|-- cockpit/
+|-- core/error_system/
+|-- generator/
+|-- integrations/
+|-- task_management/
+|-- workflows/
+|-- app.py
+|-- observability.py
+|-- operational.py
+|-- persistence.py
+|-- settings.py
+
+tests/
+docs/
+cockpit-ui/
 ```
 
----
+## Roadmap
 
-## Run the Tests
+### Phase 3: Operational Maturity
 
-From the repository root, run:
+Phase 3 focuses on making the backend easier to run, inspect, debug, and operate:
 
-```bash
-pytest
-```
+- request correlation;
+- centralized exception handling;
+- readiness checks;
+- metrics endpoint;
+- operational documentation;
+- regression validation around runtime behavior.
 
-The test suite includes coverage for areas such as:
+### Phase 4: Production Persistence
 
-- authentication;
-- client management;
-- client pipelines;
-- Cockpit services;
-- domain behavior;
-- execution services;
-- integrations;
-- monetization;
-- observability;
-- onboarding;
-- task APIs.
+Phase 4 is planned to introduce production persistence behind the existing repository contracts:
 
----
+- PostgreSQL integration;
+- SQLAlchemy repository implementations;
+- Alembic migrations;
+- runtime persistence selection;
+- JSON-to-database migration strategy.
 
-## Engineering Concepts Demonstrated
+### Phase 5: Production Hardening
 
-This project demonstrates:
+Phase 5 is planned to harden the system for deployment-oriented workflows:
 
-- modular backend design;
-- REST API development;
-- router and service separation;
-- reusable domain organization;
-- request and response contracts;
-- request identity and access-boundary concepts;
-- workflow-oriented system design;
-- frontend and backend integration;
-- automated testing;
-- technical documentation;
-- Git-based version control;
-- incremental software development.
-
----
-
-## Development Roadmap
-
-Planned areas of continued development include:
-
-- PostgreSQL database integration;
-- persistent data storage;
-- expanded authentication and authorization;
-- stronger API validation;
-- additional automated testing;
-- Docker support;
-- continuous integration;
+- authentication and authorization;
 - deployment configuration;
-- improved frontend interaction;
-- production-readiness review.
+- Docker support;
+- CI/CD workflow;
+- expanded monitoring and tracing;
+- production readiness review.
 
----
+## Project Status
 
-## Purpose
+BBIOS OS is an actively developed backend engineering portfolio project.
 
-BBIOS OS was created to strengthen practical backend engineering skills through the development of a real, evolving system.
+Implemented:
 
-The project combines my background in writing, documentation, education, and structured communication with software engineering.
+- FastAPI runtime entry point;
+- layered route, handler, service, and repository organization;
+- versioned API adapter layer;
+- service and repository contracts;
+- JSON-backed repository implementations;
+- request correlation middleware;
+- centralized structured error handling;
+- health, readiness, and metrics endpoints;
+- automated regression coverage.
 
-The central goal is the same across both disciplines:
+Planned, not yet implemented:
 
-> Turn complexity into clear, usable systems.
+- PostgreSQL persistence;
+- SQLAlchemy;
+- Alembic migrations;
+- Docker;
+- CI/CD;
+- deployment configuration;
+- production authentication and authorization.
 
----
+## Engineering Value
 
-## Author
+BBIOS OS demonstrates backend engineering skills that are directly relevant to production teams:
 
-**Biggs**
-
-Founder, Biggs Bold Ink  
-U.S. Army Veteran  
-Backend Engineering Portfolio
-
-**Write Bold. Leave Legacy.**
-
-**With Honor and Purpose.**
+- designing layered FastAPI systems;
+- preserving compatibility while improving architecture;
+- separating business logic from framework and persistence concerns;
+- defining stable contracts between services and repositories;
+- adding operational readiness without rewriting business logic;
+- validating architecture with automated tests;
+- documenting architectural decisions and future work clearly.
