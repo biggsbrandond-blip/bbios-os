@@ -9,6 +9,7 @@ from uuid import UUID
 
 from bbi_os import api
 from bbi_os.app import create_app
+from bbi_os.core.error_system.exceptions import ValidationError
 from bbi_os.observability import (
     REQUEST_ID_HEADER,
     Observability,
@@ -167,6 +168,92 @@ class OperationalMiddlewareTests(unittest.TestCase):
         self.assertEqual("client-request-1", body["request_id"])
         self.assertEqual("success", body["status"])
         self.assertEqual("Operational Client", body["data"]["name"])
+
+    def test_readiness_endpoint_reports_startup_checks(self) -> None:
+        response = asyncio.run(
+            call_asgi(
+                create_app(),
+                "GET",
+                "/health/ready",
+                [(REQUEST_ID_HEADER.lower().encode("ascii"), b"ready-request-1")],
+            )
+        )
+        body = json.loads(response["body"])
+
+        self.assertEqual(200, response["status"])
+        self.assertEqual("ready-request-1", response["headers"][REQUEST_ID_HEADER.lower()])
+        self.assertEqual("ready", body["status"])
+        self.assertEqual(
+            {
+                "settings_loaded",
+                "json_data_path_accessible",
+                "required_directories_exist",
+                "startup_completed",
+            },
+            set(body["checks"]),
+        )
+
+    def test_metrics_endpoint_reports_operational_shape(self) -> None:
+        response = asyncio.run(
+            call_asgi(
+                create_app(),
+                "GET",
+                "/metrics",
+                [(REQUEST_ID_HEADER.lower().encode("ascii"), b"metrics-request-1")],
+            )
+        )
+        body = json.loads(response["body"])
+
+        self.assertEqual(200, response["status"])
+        self.assertEqual(
+            "metrics-request-1", response["headers"][REQUEST_ID_HEADER.lower()]
+        )
+        self.assertEqual(
+            {
+                "requests_received",
+                "requests_completed",
+                "requests_failed",
+                "average_duration_ms",
+                "uptime_seconds",
+                "application_version",
+                "endpoint_metrics",
+            },
+            set(body),
+        )
+
+    def test_bbios_exception_handler_returns_structured_json(self) -> None:
+        application = create_app()
+
+        @application.get("/verification-error")
+        def verification_error():
+            raise ValidationError("verification failure")
+
+        response = asyncio.run(
+            call_asgi(
+                application,
+                "GET",
+                "/verification-error",
+                [(REQUEST_ID_HEADER.lower().encode("ascii"), b"error-request-1")],
+            )
+        )
+        body = json.loads(response["body"])
+
+        self.assertEqual(500, response["status"])
+        self.assertEqual("error-request-1", response["headers"][REQUEST_ID_HEADER.lower()])
+        self.assertEqual(
+            {
+                "error",
+                "type",
+                "message",
+                "request_id",
+                "timestamp",
+            },
+            set(body),
+        )
+        self.assertTrue(body["error"])
+        self.assertEqual("ValidationError", body["type"])
+        self.assertEqual("verification failure", body["message"])
+        self.assertEqual("error-request-1", body["request_id"])
 
 
 if __name__ == "__main__":

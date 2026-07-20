@@ -15,6 +15,8 @@ from bbi_os.__main__ import create_app as main_legacy_factory
 EXPECTED_CUSTOM_ROUTES = {
     ("GET", "/"),
     ("GET", "/health"),
+    ("GET", "/health/ready"),
+    ("GET", "/metrics"),
     ("POST", "/cockpit/create-client"),
     ("GET", "/cockpit/client/{client_id}"),
     ("GET", "/cockpit/clients/search"),
